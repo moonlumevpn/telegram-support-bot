@@ -116,23 +116,29 @@ const closeCommand = (ctx: Context): void => {
       log.info('Close command: tickets undefined');
       return;
     }
-    let userId: any = null;
+    let ticketToClose: ISupportee | null = null;
     tickets.forEach(ticket => {
       if (ticket.id.toString().padStart(6, '0') === ticketId) {
-        db.add(ticket.userid, 'closed', ticket.category, ctx.messenger);
+        ticketToClose = ticket;
       }
-      userId = ticket.userid;
     });
+
+    if (!ticketToClose) {
+      middleware.reply(ctx, cache.config.language.ticketClosedError);
+      return;
+    }
+
+    db.add(ticketToClose.userid, 'closed', ticketToClose.category, ticketToClose.messenger);
     const paddedTicket = ticketId.toString().padStart(6, '0');
     middleware.reply(ctx, `${cache.config.language.ticket} #T${paddedTicket} ${cache.config.language.closed}`);
     middleware.sendMessage(
-      userId,
-      ctx.messenger,
+      ticketToClose.userid,
+      ticketToClose.messenger,
       `${cache.config.language.ticket} #T${paddedTicket} ${cache.config.language.closed}\n\n${cache.config.language.ticketClosed}`
     );
-    delete cache.ticketIDs[userId];
-    delete cache.ticketStatus[userId];
-    delete cache.ticketSent[userId];
+    delete cache.ticketIDs[ticketToClose.userid];
+    delete cache.ticketStatus[ticketToClose.userid];
+    delete cache.ticketSent[ticketToClose.userid];
   }, groups);
 };
 
