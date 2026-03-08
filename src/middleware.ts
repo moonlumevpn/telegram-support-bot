@@ -76,6 +76,17 @@ const reply = (
   msgText: string,
   extra: any = { parse_mode: cache.config.parse_mode }
 ): void => {
+  // In Telegram forum chats, keep bot replies in the same topic thread by default.
+  if (
+    ctx?.messenger === Messenger.TELEGRAM &&
+    (ctx?.message as any)?.message_thread_id &&
+    !extra?.message_thread_id
+  ) {
+    extra = {
+      ...extra,
+      message_thread_id: (ctx.message as any).message_thread_id,
+    };
+  }
   sendMessage(ctx.message.chat.id, ctx.messenger, msgText, extra);
 };
 

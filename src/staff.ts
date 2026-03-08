@@ -166,16 +166,12 @@ async function chat(ctx: Context) {
     middleware.sendMessage(ticket.userid, ticket.messenger, ticketMsg(name, ctx.message));
   }
   const esc = middleware.strictEscape;
-  middleware.sendMessage(
-    ctx.chat.id,
-    cache.config.staffchat_type,
-    `${cache.config.language.msg_sent} ${esc(name)}`,
-  );
+  middleware.reply(ctx, `${cache.config.language.msg_sent} ${esc(name)}`);
   log.info(`Answer: ${ticketMsg(name, ctx.message)}`);
   cache.ticketSent[ticketId] = null;
 
-  // Auto-close the ticket if enabled
-  if (cache.config.auto_close_tickets) {
+  // Keep topic-based tickets open for manual /close flow.
+  if (cache.config.auto_close_tickets && !threadId) {
       db.add(ticketId, 'closed', null, ticket.messenger);
   }
 }
