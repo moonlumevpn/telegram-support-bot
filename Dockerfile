@@ -39,5 +39,5 @@ COPY --from=builder /bot/build /bot/build
 # Set NODE_ENV to production
 ENV NODE_ENV=production
 
-# Run the application
-CMD ["npm", "run", "prod", "--prefix", "/bot"]
+# Run the prebuilt application
+CMD ["node", "/bot/build/index.js"]
