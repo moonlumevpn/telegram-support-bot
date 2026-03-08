@@ -3,6 +3,7 @@ bot_token: 'YOUR_BOT_TOKEN' # support bot token
 staffchat_id: 'SUPERGROUP_CHAT_ID' # eg. -123456789
 staffchat_type: 'telegram'
 staffchat_parse_mode: 'MarkdownV2'
+# If your staff chat is a forum-enabled supergroup, the bot will create one topic per ticket automatically.
 owner_id: 'YOUR_TELEGRAM_ID'
 
 spam_cant_msg: 5

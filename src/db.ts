@@ -12,6 +12,7 @@ export interface ISupportee extends mongoose.Document {
   userid: string;
   internalIds: Array<number> | null;
   name: string | null;
+  messageThreadId: number | null;
   messenger: Messenger;
   status: string;
   category: string | null;
@@ -22,6 +23,7 @@ export const SupporteeSchema = new mongoose.Schema<ISupportee>({
   userid: { type: String, required: true },
   internalIds: { type: [Number], required: false },
   name: { type: String, required: false },
+  messageThreadId: { type: Number, required: false, default: null },
   messenger: { type: String, required: true },
   status: { type: String, default: 'open' },
   category: { type: String, default: null },
@@ -160,6 +162,17 @@ export const addIdAndName = async (
   });
 };
 
+export const setMessageThreadId = async (
+  ticketId: string | number,
+  messageThreadId: number,
+) => {
+  return await Supportee.findOneAndUpdate(
+    { ticketId },
+    { $set: { messageThreadId } },
+    { new: true },
+  );
+};
+
 export const add = async (
   userid: string | number,
   status: string,
@@ -178,7 +191,7 @@ export const add = async (
     let ticketId = await getNextTicketId();
     result = await Supportee.findOneAndReplace(
       { messenger, userid },
-      { userid, messenger, ticketId, status, category },
+      { userid, messenger, ticketId, status, category, messageThreadId: null },
       { upsert: true }
     );
   } else if (status === 'banned') {
@@ -188,6 +201,7 @@ export const add = async (
         userid,
         messenger,
         ticketId: await getNextTicketId(),
+        messageThreadId: null,
         status: 'banned',
         category: 'BANNED',
       },

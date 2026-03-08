@@ -3,6 +3,7 @@ import cache from './cache';
 import * as middleware from './middleware';
 import { Addon, Context, ModeData } from './interfaces';
 import { ISupportee } from './db';
+import { buildStaffChatSendOptions, ensureTicketTopicId } from './topics';
 
 /**
  * Generates the reply markup for a private reply.
@@ -84,9 +85,12 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
   }
 
   const fileId = (await ctx.getFile()).file_id;
+  const staffThreadId =
+    receiverId === config.staffchat_id ? await ensureTicketTopicId(ticket, ctx) : null;
   const commonOptions = {
     caption: captionText,
     reply_markup: isPrivate ? replyMarkup(ctx) : {},
+    ...(receiverId === config.staffchat_id ? buildStaffChatSendOptions(staffThreadId) : {}),
   };
 
   // Send the file based on its type

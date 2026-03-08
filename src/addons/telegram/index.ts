@@ -70,21 +70,24 @@ class TelegramAddon implements Addon {
     return response.message_id.toString();
   }
 
-  sendDocument = (
+  sendDocument = async (
     chatId: string | number,
     document: any,
     other?: any,
     signal?: any
-  ) => {
-    this.bot.api.sendDocument(chatId, document, other, signal);
+  ): Promise<string | null> => {
+    const response = await this.bot.api.sendDocument(chatId, document, other, signal);
+    return response.message_id.toString();
   };
 
-  sendPhoto(chatId: string | number, photo: any, options?: any) {
-    this.bot.api.sendPhoto(chatId, photo, options);
+  async sendPhoto(chatId: string | number, photo: any, options?: any): Promise<string | null> {
+    const response = await this.bot.api.sendPhoto(chatId, photo, options);
+    return response.message_id.toString();
   }
 
-  sendVideo(chatId: string | number, video: any, options?: any) {
-    this.bot.api.sendVideo(chatId, video, options);
+  async sendVideo(chatId: string | number, video: any, options?: any): Promise<string | null> {
+    const response = await this.bot.api.sendVideo(chatId, video, options);
+    return response.message_id.toString();
   }
 
   command(command: string, callback: (ctx: any) => void): void {

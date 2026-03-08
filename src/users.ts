@@ -4,6 +4,7 @@ import * as llm from './addons/llm';
 import * as db from './db';
 import { strictEscape as esc, reply, sendMessage } from './middleware';
 import { ISupportee } from './db';
+import { buildStaffChatSendOptions, ensureTicketTopicId } from './topics';
 import * as log from 'fancy-log'
 
 const TIME_BETWEEN_CONFIRMATION_MESSAGES = 86400000; // 24 hours
@@ -116,6 +117,7 @@ async function processTicket(
   }
 
   // Send ticket message to staff chat
+  const staffThreadId = await ensureTicketTopicId(ticket, ctx);
   const messageId = await sendMessage(
     config.staffchat_id,
     config.staffchat_type,
@@ -124,6 +126,7 @@ async function processTicket(
       ctx,
       autoReplyInfo,
     ),
+    buildStaffChatSendOptions(staffThreadId),
   );
   db.addIdAndName(ticket.ticketId, messageId, ctx.message.from.first_name);
 
@@ -188,7 +191,7 @@ async function chat(ctx: Context, chat: { id: string }) {
   // If no ticket has been sent yet, fetch from DB and set up spam timer
   if (cache.ticketSent[cache.userId] === undefined) {
     const ticket = await db.getTicketByUserId(chat.id, ctx.session.groupCategory);
-    processTicket(ticket, ctx, chat.id, autoReplyInfo);
+    await processTicket(ticket, ctx, chat.id, autoReplyInfo);
 
     // Prevent multiple notifications for a period defined by spam_time
     setTimeout(() => {
@@ -198,7 +201,8 @@ async function chat(ctx: Context, chat: { id: string }) {
   } else if (cache.ticketSent[cache.userId] < config.spam_cant_msg) {
     cache.ticketSent[cache.userId]++;
     const ticket = await db.getTicketByUserId(cache.userId, ctx.session.groupCategory);
-    sendMessage(
+    const staffThreadId = await ensureTicketTopicId(ticket, ctx);
+    const messageId = await sendMessage(
       config.staffchat_id,
       config.staffchat_type,
       formatMessageAsTicket(
@@ -206,7 +210,9 @@ async function chat(ctx: Context, chat: { id: string }) {
         ctx,
         autoReplyInfo,
       ),
+      buildStaffChatSendOptions(staffThreadId),
     );
+    db.addIdAndName(ticket.ticketId, messageId, ctx.message.from.first_name);
     if (ctx.session.group && ctx.session.group !== config.staffchat_id) {
       sendMessage(
         ctx.session.group,
