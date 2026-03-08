@@ -16,7 +16,7 @@
     "scripts": {
         "tsc": "tsc",
         "dev": "NODE_ENV=development ts-node-dev ./src/index.ts",
-        "prod": "npm run build && NODE_ENV=production node ./build/index.js",
+        "prod": "NODE_ENV=production node ./build/src/index.js",
         "build": "npm run tsc",
         "test": "NODE_ENV=test jest --detectOpenHandles --forceExit --runInBand"
     },

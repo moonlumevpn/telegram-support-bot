@@ -78,7 +78,17 @@ See the [wiki](https://github.com/bostrot/telegram-support-bot/wiki) for more de
 
 ```bash
 mv config/config-sample.yaml config.yaml
-docker-compose up -d
+docker compose up -d
+```
+
+Optional services can be started on demand via profiles:
+
+```bash
+# enable Signal bridge
+docker compose --profile signal up -d
+
+# enable MongoDB web UI
+docker compose --profile tools up -d
 ```
 
 ## 📝 Upgrading from older versions

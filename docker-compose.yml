@@ -20,6 +20,8 @@ services:
   signal-cli:
     image: bbernhard/signal-cli-rest-api:latest
     platform: linux/amd64
+    profiles:
+      - signal
     environment:
       - MODE=json-rpc #supported modes: json-rpc, native, normal
       #- AUTO_RECEIVE_SCHEDULE=0 22 * * * #enable this parameter on demand (see description below)
@@ -32,6 +34,8 @@ services:
   mongo-express:
     image: mongo-express
     restart: unless-stopped
+    profiles:
+      - tools
     ports:
       - "8081:8081"
     environment:
