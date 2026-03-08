@@ -43,6 +43,8 @@ language:
     /faq - Show frequently asked questions \n
     /open - *Staff* Shows a list of open tickets \n
     /close - *Staff* Close the ticket in the current topic (or by replying to a ticket message) \n
+    /reopen - *Staff* Reopen a closed ticket (in topic or by reply) \n
+    /delete - *Staff* Delete a closed ticket topic permanently \n
     /clear - *Staff* Closes all tickets \n
     /ban - *Staff* Ban a user from the chat \n
     /unban - *Staff* Unban a user"

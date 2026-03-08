@@ -124,6 +124,13 @@ export async function getTicketByThreadId(
   return result as ISupportee | null;
 }
 
+export async function getTicketByThreadIdAnyStatus(
+  messageThreadId: number,
+): Promise<ISupportee | null> {
+  const result = await Supportee.findOne({ messageThreadId });
+  return result as ISupportee | null;
+}
+
 export async function getByTicketIdAsync(
   ticketId: string | number,
 ): Promise<ISupportee | null> {
@@ -191,7 +198,7 @@ export const addIdAndName = async (
 
 export const setMessageThreadId = async (
   ticketId: string | number,
-  messageThreadId: number,
+  messageThreadId: number | null,
 ) => {
   return await Supportee.findOneAndUpdate(
     { ticketId },

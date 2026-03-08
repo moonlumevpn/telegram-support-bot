@@ -3,7 +3,29 @@ import cache from './cache';
 import * as middleware from './middleware';
 import { Context } from './interfaces';
 import { ISupportee } from './db';
-import { deleteTicketTopic } from './topics';
+import { closeTicketTopic, deleteTicketTopic, reopenTicketTopic } from './topics';
+
+const resolveTicketFromContext = async (
+  ctx: Context,
+  includeClosedTopicLookup: boolean = false,
+): Promise<ISupportee | null> => {
+  let ticket: ISupportee | null = null;
+
+  const replyText = ctx.message.reply_to_message?.text || ctx.message.reply_to_message?.caption;
+  const ticketIdFromReply = replyText ? extractTicketId(replyText) : undefined;
+  if (ticketIdFromReply) {
+    ticket = await db.getByTicketIdAsync(ticketIdFromReply);
+  }
+
+  const threadId = (ctx.message as any).message_thread_id;
+  if (!ticket && threadId) {
+    ticket = includeClosedTopicLookup
+      ? await db.getTicketByThreadIdAnyStatus(threadId)
+      : await db.getTicketByThreadId(threadId);
+  }
+
+  return ticket;
+};
 
 /**
  * Extracts ticket ID from the reply text.
@@ -89,18 +111,7 @@ const openCommand = (ctx: Context): void => {
  */
 const closeCommand = async (ctx: Context): Promise<void> => {
   if (!ctx.session.admin) return;
-  let ticketToClose: ISupportee | null = null;
-
-  const replyText = ctx.message.reply_to_message?.text || ctx.message.reply_to_message?.caption;
-  const ticketIdFromReply = replyText ? extractTicketId(replyText) : undefined;
-  if (ticketIdFromReply) {
-    ticketToClose = await db.getByTicketIdAsync(ticketIdFromReply);
-  }
-
-  // Forum topic flow: /close inside a ticket topic without replying to a specific message.
-  if (!ticketToClose && (ctx.message as any).message_thread_id) {
-    ticketToClose = await db.getTicketByThreadId((ctx.message as any).message_thread_id);
-  }
+  const ticketToClose = await resolveTicketFromContext(ctx);
 
   if (!ticketToClose) {
     middleware.reply(ctx, cache.config.language.ticketClosedError);
@@ -120,7 +131,7 @@ const closeCommand = async (ctx: Context): Promise<void> => {
     ticketToClose.messenger,
     `${cache.config.language.ticket} #T${paddedTicket} ${cache.config.language.closed}\n\n${cache.config.language.ticketClosed}`
   );
-  await deleteTicketTopic(ticketToClose.messageThreadId);
+  await closeTicketTopic(ticketToClose.messageThreadId);
 
   delete cache.ticketIDs[ticketToClose.userid];
   delete cache.ticketStatus[ticketToClose.userid];
@@ -157,24 +168,38 @@ const banCommand = (ctx: Context): void => {
  *
  * @param ctx - The bot context.
  */
-const reopenCommand = (ctx: Context): void => {
+const reopenCommand = async (ctx: Context): Promise<void> => {
   if (!ctx.session.admin) return;
-  const replyText = ctx.message.reply_to_message?.text || ctx.message.reply_to_message?.caption;
-  if (!replyText) return;
-  const ticketId = extractTicketId(replyText);
-  if (!ticketId) return;
-  db.getByTicketId(ticketId, (ticket: { userid: any; id: { toString: () => string } }) => {
-    if (!ticket) {
-      middleware.reply(ctx, cache.config.language.ticketClosedError);
-      return;
-    }
-    db.reopen(ticket.userid, '', ctx.messenger);
-    middleware.sendMessage(
-      ctx.chat.id,
-      ctx.messenger,
-      `${cache.config.language.usr_with_ticket} #T${ticket.id.toString().padStart(6, '0')} ${cache.config.language.ticketReopened}`
-    );
-  });
+  const ticket = await resolveTicketFromContext(ctx, true);
+  if (!ticket) {
+    middleware.reply(ctx, cache.config.language.ticketClosedError);
+    return;
+  }
+
+  await db.reopen(ticket.userid, ticket.category || '', ticket.messenger);
+  await reopenTicketTopic(ticket.messageThreadId);
+  middleware.sendMessage(
+    ctx.chat.id,
+    ctx.messenger,
+    `${cache.config.language.usr_with_ticket} #T${ticket.ticketId.toString().padStart(6, '0')} ${cache.config.language.ticketReopened}`
+  );
+};
+
+const deleteCommand = async (ctx: Context): Promise<void> => {
+  if (!ctx.session.admin) return;
+  const ticket = await resolveTicketFromContext(ctx, true);
+  if (!ticket) {
+    middleware.reply(ctx, cache.config.language.ticketClosedError);
+    return;
+  }
+  if (ticket.status !== 'closed') {
+    middleware.reply(ctx, 'Only closed tickets can be deleted.');
+    return;
+  }
+
+  await deleteTicketTopic(ticket.messageThreadId);
+  await db.setMessageThreadId(ticket.ticketId, null);
+  middleware.reply(ctx, `${cache.config.language.ticket} #T${ticket.ticketId.toString().padStart(6, '0')} topic deleted.`);
 };
 
 /**
@@ -209,5 +234,6 @@ export {
   unbanCommand,
   clearCommand,
   reopenCommand,
+  deleteCommand,
   helpCommand,
 };

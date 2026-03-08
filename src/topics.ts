@@ -47,6 +47,34 @@ export function buildStaffChatSendOptions(messageThreadId: number | null): any {
   return options;
 }
 
+export async function closeTicketTopic(messageThreadId: number | null): Promise<void> {
+  if (cache.config.staffchat_type !== 'telegram') return;
+  if (!messageThreadId) return;
+
+  try {
+    await TelegramAddon.getInstance().bot.api.closeForumTopic(
+      cache.config.staffchat_id.toString(),
+      messageThreadId,
+    );
+  } catch (err) {
+    log.error('Could not close forum topic', messageThreadId, err);
+  }
+}
+
+export async function reopenTicketTopic(messageThreadId: number | null): Promise<void> {
+  if (cache.config.staffchat_type !== 'telegram') return;
+  if (!messageThreadId) return;
+
+  try {
+    await TelegramAddon.getInstance().bot.api.reopenForumTopic(
+      cache.config.staffchat_id.toString(),
+      messageThreadId,
+    );
+  } catch (err) {
+    log.error('Could not reopen forum topic', messageThreadId, err);
+  }
+}
+
 export async function deleteTicketTopic(messageThreadId: number | null): Promise<void> {
   if (cache.config.staffchat_type !== 'telegram') return;
   if (!messageThreadId) return;
