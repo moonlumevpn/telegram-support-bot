@@ -196,7 +196,7 @@ async function forwardFile(ctx: Context) {
   const ticket = await db.getTicketByUserId(ctx.message.from.id, ctx.session.groupCategory);
   let ok = false;
   if (!ticket || !ticket.status || ticket.status === 'closed') {
-    db.add(ctx.message.from.id, 'open', null, ctx.messenger);
+    await db.add(ctx.message.from.id, 'open', ctx.session.groupCategory, ctx.messenger);
     ok = true;
   }
   if (ok || (ticket && ticket.status !== 'banned')) {

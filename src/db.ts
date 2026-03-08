@@ -96,13 +96,40 @@ export async function getTicketByUserId (
   userId: string | number,
   category: string | null
 ) {
-  const query = {
-    $or: [{ userid: userId }],
-    ...(category ? { category } : { category: null }),
+  // Prefer an open ticket for this user, independent of category when category is not provided.
+  // This avoids creating a new ticket for every message when session category is not set.
+  const openQuery = {
+    userid: userId,
+    status: 'open',
+    ...(category ? { category } : {}),
   };
-  const result = await Supportee.findOne(query);
+  let result = await Supportee.findOne(openQuery).sort({ ticketId: -1 });
+  if (result) return result;
+
+  const fallbackQuery = {
+    userid: userId,
+    ...(category ? { category } : {}),
+  };
+  result = await Supportee.findOne(fallbackQuery).sort({ ticketId: -1 });
   return result;
 };
+
+export async function getTicketByThreadId(
+  messageThreadId: number,
+): Promise<ISupportee | null> {
+  const result = await Supportee.findOne({
+    messageThreadId,
+    status: 'open',
+  });
+  return result as ISupportee | null;
+}
+
+export async function getByTicketIdAsync(
+  ticketId: string | number,
+): Promise<ISupportee | null> {
+  const result = await Supportee.findOne({ ticketId });
+  return result as ISupportee | null;
+}
 
 export const getByTicketId = async (
   ticketId: string,

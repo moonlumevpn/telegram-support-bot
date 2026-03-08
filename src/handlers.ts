@@ -11,7 +11,6 @@ export function registerCommonHandlers(addon: any, keys?: any) {
   addon.command('open', (ctx: any) => commands.openCommand(ctx));
   addon.command('close', (ctx: any) => commands.closeCommand(ctx));
   addon.command('ban', (ctx: any) => commands.banCommand(ctx));
-  addon.command('reopen', (ctx: any) => commands.reopenCommand(ctx));
   addon.command('unban', (ctx: any) => commands.unbanCommand(ctx));
   addon.command('clear', (ctx: any) => commands.clearCommand(ctx));
 

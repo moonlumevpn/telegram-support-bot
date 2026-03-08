@@ -105,21 +105,29 @@ async function chat(ctx: Context) {
     return;
   }
 
-  const replyMsg = ctx.message?.reply_to_message;
-  if (!replyMsg) return;
-
-  const replyText = replyMsg.text || replyMsg.caption;
-  const replyMessageId = ctx.message.external_reply?.message_id;
-  if (!replyText && !replyMessageId) return;
-
   var ticket;
   var ticketId;
-  if (replyMessageId) {
+  const replyMsg = ctx.message?.reply_to_message;
+  const replyText = replyMsg?.text || replyMsg?.caption;
+  const replyMessageId = ctx.message.external_reply?.message_id;
+  const threadId = (ctx.message as any).message_thread_id;
+
+  // Preferred flow: if admin writes inside a ticket topic, route by topic id.
+  if (
+    threadId &&
+    ctx.chat?.id?.toString() === cache.config.staffchat_id.toString()
+  ) {
+    ticket = await db.getTicketByThreadId(threadId);
+    if (ticket) {
+      ticketId = ticket.ticketId;
+    }
+  } else if (replyMessageId) {
     ticket = await db.getTicketByInternalId(replyMessageId);
     if (ticket) {
       ticketId = ticket.ticketId;
     }
   } else {
+    if (!replyText) return;
     ticketId = parseInt(await extractTicketId(replyText, ctx));
     
     if (!ticketId) return;

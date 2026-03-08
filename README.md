@@ -7,7 +7,7 @@
 ![js-google-style](https://img.shields.io/badge/code%20style-google-brightgreen.svg?style=for-the-badge)
 [![Documentation](https://img.shields.io/badge/DOCUMENTATION-WIKI-green?style=for-the-badge)](https://github.com/bostrot/telegram-support-bot/wiki)
 
-> TSB is a support bot for Telegram and Signal. It lets users create tickets which will be sent to a staff group and can be answered by a reply.  
+> TSB is a support bot for Telegram and Signal. It lets users create tickets which will be sent to a staff group and can be answered by staff.  
 > Now also supports LLMs (e.g. OpenAI) to automatically assist users.
 
 <table>
@@ -21,7 +21,7 @@
 
 ## ✨ Features
 
-When a user sends a message to the support chat it will create a ticket which will be forwarded to the staff group. Any admin in the staff group may answer that ticket by just replying to it. Salutation is added automatically. Photos will be forwarded too.
+When a user sends a message to the support chat it will create a ticket which will be forwarded to the staff group. In forum-enabled staff groups, each ticket is handled in its own topic and staff can answer directly in that topic. Salutation is added automatically. Photos will be forwarded too.
 
 - [x] File forwarding from and to user
 - [x] Database for handling open and closed tickets
@@ -61,8 +61,7 @@ llm_knowledge: >
 Currently the support chat offers these commands (staff commands):
 
 - `/open` - lists all open tickets (messages where no one has replied yet)
-- `/reopen` - reopen a closed ticket
-- `/close` - close a ticket manually (in case someone writes 'thank you')
+- `/close` - close the current ticket manually
 - `/ban` - ban a person from writing to your chat
 
 User commands:

@@ -42,8 +42,7 @@ language:
     /start - Get a little introduction \n
     /faq - Show frequently asked questions \n
     /open - *Staff* Shows a list of open tickets \n
-    /reopen - *Staff* Reopen a closed ticket \n
-    /close - *Staff* Reply to a ticket with this to close and unban \n
+    /close - *Staff* Close the ticket in the current topic (or by replying to a ticket message) \n
     /clear - *Staff* Closes all tickets \n
     /ban - *Staff* Ban a user from the chat \n
     /unban - *Staff* Unban a user"
