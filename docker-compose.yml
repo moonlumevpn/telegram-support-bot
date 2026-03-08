@@ -1,6 +1,6 @@
 services:
   supportbot:
-    build: .
+    image: ghcr.io/moonlumevpn/telegram-support-bot:${BOT_IMAGE_TAG:-development}
     restart: unless-stopped
     volumes:
       - ./config:/bot/config
