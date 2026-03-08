@@ -27,11 +27,8 @@ WORKDIR /bot
 COPY ./package.json /bot/package.json
 COPY ./package-lock.json /bot/package-lock.json
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 build-base
-
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /bot/build /bot/build
