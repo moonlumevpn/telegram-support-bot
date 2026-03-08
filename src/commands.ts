@@ -12,7 +12,7 @@ import * as log from 'fancy-log'
  * @returns The ticket ID as a string or undefined if not found.
  */
 const extractTicketId = (replyText: string): string | undefined => {
-  const match = replyText.match(new RegExp(`#T(.*) ${cache.config.language.from}`));
+  const match = replyText.match(new RegExp(`\\\\?#T(.*) ${cache.config.language.from}`));
   return match ? match[1] : undefined;
 };
 

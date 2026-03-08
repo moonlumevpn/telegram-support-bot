@@ -76,9 +76,9 @@ function privateReply(ctx: Context, msg: any = {}) {
  */
 function extractTicketId(replyText: string, ctx: Context): string | null {
   const { language } = cache.config;
-  let match = replyText.match(new RegExp(`#T(.*) ${language.from}`));
+  let match = replyText.match(new RegExp(`\\\\?#T(.*) ${language.from}`));
   if (!match) {
-    match = replyText.match(new RegExp(`#T(.*)\n${language.from}`));
+    match = replyText.match(new RegExp(`\\\\?#T(.*)\n${language.from}`));
   }
   return match ? match[1].trim() : null;
 }

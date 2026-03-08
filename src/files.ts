@@ -87,8 +87,10 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
   const fileId = (await ctx.getFile()).file_id;
   const staffThreadId =
     receiverId === config.staffchat_id ? await ensureTicketTopicId(ticket, ctx) : null;
+  const staffParseMode = config.staffchat_parse_mode || config.parse_mode;
+  const captionForStaff = middleware.strictEscape(captionText, staffParseMode);
   const commonOptions = {
-    caption: captionText,
+    caption: receiverId === config.staffchat_id ? captionForStaff : captionText,
     reply_markup: isPrivate ? replyMarkup(ctx) : {},
     ...(receiverId === config.staffchat_id ? buildStaffChatSendOptions(staffThreadId) : {}),
   };

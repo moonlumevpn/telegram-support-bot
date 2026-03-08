@@ -23,17 +23,18 @@ function formatMessageAsTicket(
   ticket: { toString: () => string },
   ctx: Context,
   autoReplyInfo?: any,
+  parseMode: string = cache.config.parse_mode,
 ): string {
   const { config, userId } = cache;
-  var name = `[${esc(ctx.message.from.first_name,)}](tg://user?id=${userId})`;
-  if (config.anonymous_tickets || config.staffchat_parse_mode === ParseMode.PLAINTEXT) {
+  const ticketLabel = esc(`#T${ticket.toString().padStart(6, '0')}`, parseMode);
+  const groupTag = ctx.session.groupTag ? ` ${esc(ctx.session.groupTag, parseMode)}` : '';
+  const escapedText = esc(ctx.message.text, parseMode);
+  const autoReplySuffix = autoReplyInfo ? `\n\n*${esc(autoReplyInfo, parseMode)}*` : '';
+  var name = `[${esc(ctx.message.from.first_name, parseMode)}](tg://user?id=${userId})`;
+  if (config.anonymous_tickets || parseMode === ParseMode.PLAINTEXT || parseMode === 'none') {
     name = ctx.message.from.first_name;
   }
-  return `${config.language.ticket} #T${ticket
-    .toString()
-    .padStart(6, '0')} ${config.language.from} ${name} ${config.language.language}: ${ctx.message.from.language_code} ${ctx.session.groupTag}\n\n${esc(
-      ctx.message.text,
-    )}\n\n${autoReplyInfo ? `*${autoReplyInfo}*` : ''}`;
+  return `${config.language.ticket} ${ticketLabel} ${config.language.from} ${name} ${config.language.language}: ${ctx.message.from.language_code}${groupTag}\n\n${escapedText}${autoReplySuffix}`;
 }
 
 /**
@@ -118,6 +119,8 @@ async function processTicket(
 
   // Send ticket message to staff chat
   const staffThreadId = await ensureTicketTopicId(ticket, ctx);
+  const staffOptions = buildStaffChatSendOptions(staffThreadId);
+  const staffParseMode = staffOptions.parse_mode || config.parse_mode;
   const messageId = await sendMessage(
     config.staffchat_id,
     config.staffchat_type,
@@ -125,8 +128,9 @@ async function processTicket(
       ticket.ticketId,
       ctx,
       autoReplyInfo,
+      staffParseMode,
     ),
-    buildStaffChatSendOptions(staffThreadId),
+    staffOptions,
   );
   db.addIdAndName(ticket.ticketId, messageId, ctx.message.from.first_name);
 
@@ -155,6 +159,7 @@ async function processTicket(
         },
       }
       : { parse_mode: config.parse_mode };
+    const groupParseMode = groupOptions.parse_mode || config.parse_mode;
 
     sendMessage(
       ctx.session.group,
@@ -163,6 +168,7 @@ async function processTicket(
         ticket.ticketId,
         ctx,
         autoReplyInfo,
+        groupParseMode,
       ),
       groupOptions,
     );
@@ -209,6 +215,7 @@ async function chat(ctx: Context, chat: { id: string }) {
         ticket.ticketId,
         ctx,
         autoReplyInfo,
+        cache.config.staffchat_parse_mode || config.parse_mode,
       ),
       buildStaffChatSendOptions(staffThreadId),
     );
@@ -221,6 +228,7 @@ async function chat(ctx: Context, chat: { id: string }) {
           ticket.ticketId,
           ctx,
           autoReplyInfo,
+          config.parse_mode,
         ),
       );
     }

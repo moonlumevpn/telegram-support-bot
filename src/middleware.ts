@@ -9,9 +9,8 @@ import TelegramAddon from './addons/telegram';
  * @param str - The string to escape.
  * @returns The escaped string.
  */
-const strictEscape = (str: string): string => {
-  const { parse_mode } = cache.config;
-  switch (parse_mode) {
+const strictEscape = (str: string, parseMode: string = cache.config.parse_mode): string => {
+  switch (parseMode) {
     case 'MarkdownV2':
       // Escape all special MarkdownV2 characters
       return str.replace(/([[\]()_*~`>#+\-=\|{}.!\\])/g, '\\$1');
@@ -25,8 +24,8 @@ const strictEscape = (str: string): string => {
     case 'Markdown':
       // Escape special Markdown characters (square brackets separately for safety)
       return str
-        .replace(/([[\]_*`])/g, '\$1')
-        .replace(/(\[|\])/g, '\$1');
+        .replace(/([[\]_*`])/g, '\\$1')
+        .replace(/(\[|\])/g, '\\$1');
     default:
       return str.toString();
   }
