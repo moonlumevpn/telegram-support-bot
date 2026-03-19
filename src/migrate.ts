@@ -6,6 +6,7 @@ import * as log from 'fancy-log'
 
 const MONGO_URI = cache.config.mongodb_uri || 'mongodb://localhost:27017/support';
 const collectionName = `bot_${cache.config.owner_id}_${cache.config.bot_token.slice(-5)}`;
+const SQLITE_PATH = cache.config.sqlite_path || './config/support.db';
 
 const Supportee: Model<ISupportee> = 
   mongoose.models[collectionName] as Model<ISupportee> ||
@@ -15,7 +16,7 @@ export const migrateData = async () => {
   let sqliteDb;
   try {
     const Database = require('better-sqlite3');
-    sqliteDb = new Database('./config/support.db');
+    sqliteDb = new Database(SQLITE_PATH);
   } catch (err) {
     // better-sqlite3 not available, skip migration
     return;

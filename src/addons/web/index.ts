@@ -2,6 +2,7 @@ import fakectx from '../fakectx';
 import {ticketHandler} from '../../text';
 import cache from '../../cache';
 import TelegramAddon from '../telegram';
+import { Messenger } from '../../interfaces';
 import rateLimit from 'express-rate-limit';
 import * as log from 'fancy-log'
 
@@ -35,12 +36,37 @@ const init = function(bot: TelegramAddon) {
     // });
 
     app.get('/', (_req: any, res: any) => {
-      res.sendFile(__dirname + '/web/index.html');
+      res.sendFile(__dirname + '/index.html');
     });
 
     app.get('/chat.js', (_req: any, res: any) => {
-      res.sendFile(__dirname + '/web/chat.js');
+      res.sendFile(__dirname + '/chat.js');
     });
+
+    type WebChatPayload = {
+      text: string;
+      name?: string;
+      username?: string;
+      metadata?: Record<string, any>;
+    };
+
+    const normalizePayload = (payload: unknown): WebChatPayload | null => {
+      if (typeof payload === 'string') {
+        return {text: payload};
+      }
+      if (payload && typeof payload === 'object') {
+        const text = (payload as any).text;
+        if (typeof text === 'string') {
+          return {
+            text,
+            name: (payload as any).name,
+            username: (payload as any).username,
+            metadata: (payload as any).metadata,
+          };
+        }
+      }
+      return null;
+    };
 
     io.on(
         'connection',
@@ -49,18 +75,36 @@ const init = function(bot: TelegramAddon) {
         emit: (arg0: string, arg1: any) => void;
         id: string;
       }) => {
-          socket.on('chat', (msg: string) => {
-            socket.emit('chat_user', msg);
+          socket.on('chat', (payload: unknown) => {
+            const normalized = normalizePayload(payload);
+            if (!normalized || !normalized.text) {
+              return;
+            }
+            socket.emit('chat_user', normalized.text);
+            fakectx.messenger = Messenger.WEB;
             fakectx.message.from.id = 'WEB' + socket.id;
             fakectx.message.chat.id = 'WEB' + socket.id;
-            fakectx.message.text = msg;
+            fakectx.message.text = normalized.text;
+            fakectx.from.id = 'WEB' + socket.id;
+            if (normalized.name) {
+              fakectx.message.from.first_name = normalized.name;
+              fakectx.message.chat.first_name = normalized.name;
+            }
+            if (normalized.username) {
+              fakectx.message.from.username = normalized.username;
+              fakectx.message.chat.username = normalized.username;
+              fakectx.from.username = normalized.username;
+            }
+            if (normalized.metadata) {
+              (fakectx.message as any).metadata = normalized.metadata;
+            }
             ticketHandler(bot, fakectx);
           });
           socket.on('disconnect', () => log.info('Disconnected'));
         },
     );
 
-    server.listen(8080, () => log.info(`Server started on port ${port}`));
+    server.listen(port, () => log.info(`Server started on port ${port}`));
   }
 };
 

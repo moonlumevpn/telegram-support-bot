@@ -163,7 +163,7 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       if (input.value) {
-        socket.emit('chat', input.value);
+        socket.emit('chat', { text: input.value });
         input.value = '';
       }
     });

@@ -6,12 +6,17 @@ import * as db from './db';
 import * as error from './error';
 import TelegramAddon from './addons/telegram';
 import SignalAddon from './addons/signal';
+import * as webserver from './addons/web';
 import * as log from 'fancy-log'
 
 /**
  * Check and migrate SQLite database to MongoDB.
  */
 async function checkAndMigrateDatabase() {
+  if (cache.config.storage_driver === 'sqlite') {
+    log.info('SQLite storage enabled. Skipping migration to MongoDB.');
+    return;
+  }
   const sqliteDbPath = './config/support.db';
   const migratedDbPath = './config/support.old.db';
 
@@ -72,7 +77,8 @@ async function main(logs = true) {
   // Initialize the webserver if enabled and if there's a Telegram addon.
   const telegramAddon = addons.find((addon) => (addon as any).platform === 'telegram');
   if (cache.config.web_server && telegramAddon) {
-    // webserver.init(telegramAddon);
+    log.info('Initializing web server addon...');
+    webserver.init(telegramAddon as TelegramAddon);
   }
 
   // Initialize global error handling.

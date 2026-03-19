@@ -120,6 +120,8 @@ export class Config {
   pass_start: boolean = false;
   categories: Category[] = [];
   mongodb_uri: string = 'mongodb://mongodb:27017/support';
+  storage_driver: 'mongo' | 'sqlite' = 'mongo';
+  sqlite_path: string = './config/support.db';
   use_llm: boolean = false;
   llm_api_key: string;
   llm_base_url: string;

@@ -20,8 +20,14 @@ class TelegramAddon implements Addon {
     this.bot = new Bot<BotContext>(token);
     const throttler = apiThrottler();
     this.bot.api.config.use(throttler);
+    const initStart = Date.now();
+    log.info('Telegram Addon: initializing bot...');
     this.bot.init().then(() => {
       this.botInfo = this.bot.botInfo;
+      log.info(`Telegram Addon: init completed in ${Date.now() - initStart}ms`);
+      if (this.botInfo?.username) {
+        log.info(`Telegram Addon: bot username @${this.botInfo.username}`);
+      }
     });
   }
 
@@ -111,6 +117,7 @@ class TelegramAddon implements Addon {
     log.info('Starting Telegram Addon...');
 
     // Setup session and middleware.
+    log.info('Telegram Addon: setting up session and middleware...');
     this.bot.use(this.initSession());
     this.bot.use((ctx: any, next: () => any) => {
       ctx.messenger = Messenger.TELEGRAM;
@@ -123,11 +130,15 @@ class TelegramAddon implements Addon {
       permissions.checkPermissions(ctx, next, cache.config);
     });
 
+    log.info('Telegram Addon: initializing inline handlers...');
     const keys = inline.initInline(this);
+    log.info('Telegram Addon: registering common handlers...');
     registerCommonHandlers(this, keys);
 
     // Start the Bot.
+    log.info('Telegram Addon: starting long polling...');
     this.bot.start();
+    log.info('Telegram Addon: start() invoked.');
   }
 }
 
