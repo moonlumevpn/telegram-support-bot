@@ -199,7 +199,12 @@ const deleteCommand = async (ctx: Context): Promise<void> => {
 
   await deleteTicketTopic(ticket.messageThreadId);
   await db.setMessageThreadId(ticket.ticketId, null);
-  middleware.reply(ctx, `${cache.config.language.ticket} #T${ticket.ticketId.toString().padStart(6, '0')} topic deleted.`);
+  middleware.sendMessage(
+    ctx.chat.id,
+    ctx.messenger,
+    `${cache.config.language.ticket} #T${ticket.ticketId.toString().padStart(6, '0')} topic deleted.`,
+    { parse_mode: cache.config.parse_mode },
+  );
 };
 
 /**
