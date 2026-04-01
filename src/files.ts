@@ -44,25 +44,49 @@ const replyMarkup = (ctx: Context): object => {
 async function fileHandler(type: string, bot: Addon, ctx: Context) {
   const { message, session } = ctx;
   const { config } = cache;
-  let userid: string | null;
+  let userid: string | number | null;
   let replyText = '';
+  const inStaffChat =
+    ctx.chat?.id?.toString() === config.staffchat_id.toString();
+  const threadId = (message as any)?.message_thread_id;
+  const replyMessageId = message?.external_reply?.message_id;
+  let adminTicket: ISupportee | null = null;
+
+  // If admin is replying in staff chat, resolve ticket by topic or replied message.
+  if (session.admin) {
+    if (threadId && inStaffChat) {
+      adminTicket = await db.getTicketByThreadId(threadId);
+    }
+    if (!adminTicket && replyMessageId) {
+      adminTicket = await db.getTicketByInternalId(replyMessageId);
+    }
+  }
 
   // If replying to a message and if the session is admin, extract ticket info
-  if (message && message.reply_to_message?.text && session.admin) {
-    replyText = message.reply_to_message.text || message.reply_to_message.caption;
-    if (!replyText) return;
-    userid = await (await db.getTicketByInternalId(message.external_reply.message_id)).userid;
-    if (!userid) return;
-  }
-  if (!userid) {
-    userid = message.from.id;
+  if (message && message.reply_to_message && session.admin) {
+    replyText = message.reply_to_message.text || message.reply_to_message.caption || '';
+    if (replyMessageId && !adminTicket) {
+      const ticketByReply = await db.getTicketByInternalId(replyMessageId);
+      if (ticketByReply) {
+        adminTicket = ticketByReply;
+      }
+    }
   }
 
-  const userInfo = await forwardFile(ctx);
+  let userInfo: any;
+  let ticket: ISupportee | null = null;
+  if (session.admin && adminTicket) {
+    userid = adminTicket.userid;
+    ticket = adminTicket;
+  } else {
+    if (!userid) {
+      userid = message.from.id;
+    }
+    userInfo = await forwardFile(ctx);
+    ticket = await db.getTicketByUserId(userid, session.groupCategory);
+  }
   let receiverId: string | number = config.staffchat_id;
   let isPrivate = false;
-
-  const ticket = await db.getTicketByUserId(userid, session.groupCategory);
   if (!ticket) {
     if (session.admin && userInfo === undefined) {
       middleware.reply(ctx, config.language.ticketClosedError);
