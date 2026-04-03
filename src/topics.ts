@@ -3,7 +3,7 @@ import * as db from './db';
 import TelegramAddon from './addons/telegram';
 import { Context } from './interfaces';
 import { ISupportee } from './db';
-import * as log from 'fancy-log';
+import * as log from './logger';
 
 const MAX_TOPIC_NAME_LEN = 128;
 

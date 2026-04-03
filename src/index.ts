@@ -7,7 +7,7 @@ import * as error from './error';
 import TelegramAddon from './addons/telegram';
 import SignalAddon from './addons/signal';
 import * as webserver from './addons/web';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 /**
  * Check and migrate SQLite database to MongoDB.

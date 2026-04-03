@@ -112,6 +112,7 @@ export class Config {
   web_server_ssl_cert: string = '';
   web_server_ssl_key: string = '';
   dev_mode: boolean = false;
+  log_level: 'silent' | 'error' | 'info' | 'debug' = 'info';
   show_user_ticket: boolean = false;
   language: Language;
   autoreply_confirmation: boolean = true;

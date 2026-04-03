@@ -2,7 +2,7 @@
 import mongoose, { Model } from 'mongoose';
 import cache from './cache';
 import { ISupportee, SupporteeSchema } from './db';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 const MONGO_URI = cache.config.mongodb_uri || 'mongodb://localhost:27017/support';
 const collectionName = `bot_${cache.config.owner_id}_${cache.config.bot_token.slice(-5)}`;

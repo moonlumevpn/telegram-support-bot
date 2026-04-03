@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import cache from './cache';
 import { Messenger } from './interfaces';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 const STORAGE_DRIVER = (cache.config.storage_driver || 'mongo').toLowerCase();
 const SQLITE_PATH = cache.config.sqlite_path || './config/support.db';
@@ -70,6 +70,13 @@ const rowToSupportee = (row: any): ISupportee => {
 const toTicketIdQueryValue = (value: any): number => {
   const num = typeof value === 'number' ? value : parseInt(String(value), 10);
   return Number.isNaN(num) ? -1 : num;
+};
+
+const buildUserOrTicketQuery = (userid: any) => {
+  const ticketIdValue = toTicketIdQueryValue(userid);
+  return {
+    $or: [{ userid: userid }, { ticketId: ticketIdValue }],
+  };
 };
 
 export async function connect() {
@@ -155,7 +162,7 @@ export const check = async (
     return;
   }
   const query = {
-    $or: [{ userid: userid }, { ticketId: userid }],
+    ...buildUserOrTicketQuery(userid),
     ...(category && { category }),
   };
   const result = await Supportee.find(query);
@@ -367,7 +374,7 @@ export const reopen = async (userid: any, category: string, messenger: string) =
   }
   const query = {
     messenger,
-    $or: [{ userid: userid }, { ticketId: userid }],
+    ...buildUserOrTicketQuery(userid),
     ...(category && { category }),
   };
   await Supportee.updateMany(query, { $set: { status: 'open' } });
@@ -483,7 +490,7 @@ export const add = async (
   if (status === 'closed') {
     const query = {
       messenger,
-      $or: [{ userid: userid }, { ticketId: userid }],
+      ...buildUserOrTicketQuery(userid),
       ...(category && { category }),
     };
     result = await Supportee.updateMany(query, { $set: { status: 'closed' } });

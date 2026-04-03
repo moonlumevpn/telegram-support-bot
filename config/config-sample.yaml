@@ -36,6 +36,7 @@ web_server: false # Enable/disable web server
 web_server_port: 8080 # Port for web server
 
 dev_mode: true # Enable/disable dev mode
+log_level: 'info' # Options: silent, error, info, debug
 
 # customize your language
 language:

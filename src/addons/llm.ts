@@ -1,6 +1,7 @@
 import { Context } from '../interfaces';
 import OpenAI from 'openai';
 import cache from '../cache';
+import * as log from '../logger';
 
 const llm = new OpenAI({
     apiKey: cache.config.llm_api_key,
@@ -35,7 +36,7 @@ async function getResponseFromLLM(ctx: Context): Promise<string | null> {
         return message;
     }
     catch (error) {
-        console.error("Error in LLM response:", error);
+        log.error('Error in LLM response:', error);
         return null;
     }
 }

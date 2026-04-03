@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as util from 'util';
 import cache from './cache';
 import * as middleware from './middleware';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 const debugFile = './config/debug.log';
 const logStdout = process.stdout;
@@ -73,7 +73,7 @@ function init(logs = true) {
   // Catch uncaught exceptions to log them and notify staff
   process.on('uncaughtException', (err) => {
     rateLimit();
-    log.info('=== UNHANDLED ERROR ===');
+    log.error('=== UNHANDLED ERROR ===');
     fs.appendFile(debugFile, err.stack + '\n', 'utf8', appendErr => {
       if (appendErr) throw appendErr;
     });
@@ -90,11 +90,11 @@ function init(logs = true) {
   // Catch unhandled promise rejections to log them and notify staff if necessary
   process.on('unhandledRejection', (err: any) => {
     rateLimit();
-    log.info('=== UNHANDLED REJECTION ===');
+    log.error('=== UNHANDLED REJECTION ===');
     fs.appendFile(debugFile, err + '\n', 'utf8', appendErr => {
       if (appendErr) throw appendErr;
     });
-    console.dir(`${new Date()}: ${err.stack}`);
+    log.error(`${new Date()}: ${err.stack}`);
     if (currentErrors === 0) {
       middleware.sendMessage(
         cache.config.staffchat_id,

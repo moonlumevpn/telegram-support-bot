@@ -4,7 +4,7 @@ import * as inline from './inline';
 import * as files from './files';
 import * as text from './text';
 import cache from './cache';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 export function registerCommonHandlers(addon: any, keys?: any) {
   // Register commands common to both platforms.

@@ -3,7 +3,7 @@ import * as middleware from './middleware';
 import * as db from './db';
 import { Context } from './interfaces';
 import { ISupportee } from './db';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 /**
  * Generates a ticket message.
@@ -76,10 +76,7 @@ function privateReply(ctx: Context, msg: any = {}) {
  */
 function extractTicketId(replyText: string, ctx: Context): string | null {
   const { language } = cache.config;
-  let match = replyText.match(new RegExp(`\\\\?#T(.*) ${language.from}`));
-  if (!match) {
-    match = replyText.match(new RegExp(`\\\\?#T(.*)\n${language.from}`));
-  }
+  const match = replyText.match(new RegExp(`\\\\?#T(\\d+)\\s+${language.from}`));
   return match ? match[1].trim() : null;
 }
 

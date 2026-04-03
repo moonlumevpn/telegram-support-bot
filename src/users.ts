@@ -5,7 +5,7 @@ import * as db from './db';
 import { strictEscape as esc, reply, sendMessage } from './middleware';
 import { ISupportee } from './db';
 import { buildStaffChatSendOptions, ensureTicketTopicId } from './topics';
-import * as log from 'fancy-log'
+import * as log from './logger'
 
 const TIME_BETWEEN_CONFIRMATION_MESSAGES = 86400000; // 24 hours
 
