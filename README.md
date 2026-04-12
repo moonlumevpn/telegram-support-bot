@@ -64,6 +64,7 @@ Currently the support chat offers these commands (staff commands):
 - `/close` - close the current ticket/topic manually
 - `/reopen` - reopen a closed ticket/topic
 - `/delete` - delete a closed topic permanently
+- `/direct <telegram_id> <message>` - send a direct message to a Telegram user from the current topic
 - `/ban` - ban a person from writing to your chat
 
 User commands:

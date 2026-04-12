@@ -50,6 +50,7 @@ language:
     /close - *Staff* Close the ticket in the current topic (or by replying to a ticket message) \n
     /reopen - *Staff* Reopen a closed ticket (in topic or by reply) \n
     /delete - *Staff* Delete a closed ticket topic permanently \n
+    /direct - *Staff* Send a direct message to a Telegram user by ID in the current topic \n
     /clear - *Staff* Closes all tickets \n
     /ban - *Staff* Ban a user from the chat \n
     /unban - *Staff* Unban a user"

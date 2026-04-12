@@ -52,6 +52,32 @@ const helpCommand = (ctx: Context): void => {
 };
 
 /**
+ * Send a direct message to a Telegram user by ID.
+ *
+ * Usage: /direct <telegram_id> <message>
+ *
+ * @param ctx - The bot context.
+ */
+const directCommand = async (ctx: Context): Promise<void> => {
+  if (!ctx.session.admin) return;
+
+  const rawInput =
+    (typeof (ctx as any).match === 'string' && (ctx as any).match.trim()) ||
+    (ctx.message?.text || '').replace(/^\/direct(?:@\w+)?\s*/i, '').trim();
+  const match = rawInput.match(/^(\d+)\s+([\s\S]+)$/);
+
+  if (!match) {
+    middleware.reply(ctx, 'Usage: /direct {telegram_id} {message}');
+    return;
+  }
+
+  const [, targetUserId, directMessage] = match;
+
+  await middleware.sendMessage(targetUserId, ctx.messenger, directMessage, {});
+  middleware.reply(ctx, `${cache.config.language.msg_sent} ${targetUserId}`);
+};
+
+/**
  * Close all open tickets.
  *
  * @param ctx - The bot context.
@@ -243,4 +269,5 @@ export {
   reopenCommand,
   deleteCommand,
   helpCommand,
+  directCommand,
 };

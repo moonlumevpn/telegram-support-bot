@@ -15,6 +15,9 @@ export function registerCommonHandlers(addon: any, keys?: any) {
   addon.command('ban', (ctx: any) => commands.banCommand(ctx));
   addon.command('unban', (ctx: any) => commands.unbanCommand(ctx));
   addon.command('clear', (ctx: any) => commands.clearCommand(ctx));
+  if (addon.platform === 'telegram') {
+    addon.command('direct', (ctx: any) => commands.directCommand(ctx));
+  }
 
   addon.command('id', (ctx: any) =>
     middleware.reply(ctx, `User ID: ${ctx.from.id}\nGroup ID: ${ctx.chat.id}`, {

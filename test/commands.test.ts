@@ -15,6 +15,14 @@ jest.mock('../src/db', () => ({
   getByTicketId: jest.fn((ticketId, callback) => {
     callback({ userid: 'user123', id: { toString: () => ticketId } });
   }),
+  getByTicketIdAsync: jest.fn(async (ticketId) => ({
+    ticketId,
+    userid: 'user123',
+    category: 'support',
+    messenger: 'telegram',
+    status: 'open',
+    messageThreadId: null,
+  })),
   reopen: jest.fn(), // Add reopen mock
   add: jest.fn(),    // Add add mock
 }));
@@ -25,12 +33,24 @@ jest.mock('../src/cache', () => ({
       helpCommandText: 'Help: /start, /help',
       helpCommandStaffText: 'Staff: /clear, /open, /close',
       from: 'From:',
+      msg_sent: 'Message sent to user',
     },
     parse_mode: 'MarkdownV2',
   },
   ticketIDs: [],
   ticketStatus: [],
   ticketSent: [],
+}));
+
+jest.mock('openai', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: jest.fn(),
+      },
+    },
+  })),
 }));
 
 import * as commands from '../src/commands';
@@ -202,6 +222,33 @@ describe('Commands Module', () => {
       const ctx = createMockContext(true);
       commands.banCommand(ctx);
       expect(true).toBe(true);
+    });
+  });
+
+  describe('directCommand', () => {
+    it('should send a direct message to the provided Telegram user id', async () => {
+      const ctx = createMockContext(true);
+      ctx.message.text = '/direct 123456 Hello there';
+
+      await commands.directCommand(ctx);
+
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        '123456',
+        ctx.messenger,
+        'Hello there',
+        {}
+      );
+      expect(mockReply).toHaveBeenCalledWith(ctx, 'Message sent to user 123456');
+    });
+
+    it('should show usage when the command is incomplete', async () => {
+      const ctx = createMockContext(true);
+      ctx.message.text = '/direct 123456';
+
+      await commands.directCommand(ctx);
+
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockReply).toHaveBeenCalledWith(ctx, 'Usage: /direct {telegram_id} {message}');
     });
   });
 
