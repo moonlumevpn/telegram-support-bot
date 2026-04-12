@@ -3,7 +3,7 @@ import cache from './cache';
 import * as middleware from './middleware';
 import { Context } from './interfaces';
 import { ISupportee } from './db';
-import { closeTicketTopic, deleteTicketTopic, reopenTicketTopic } from './topics';
+import { closeTicketTopic, deleteTicketTopic } from './topics';
 
 const resolveTicketFromContext = async (
   ctx: Context,
@@ -191,28 +191,6 @@ const banCommand = (ctx: Context): void => {
   });
 };
 
-/**
- * Reopen a closed ticket.
- *
- * @param ctx - The bot context.
- */
-const reopenCommand = async (ctx: Context): Promise<void> => {
-  if (!ctx.session.admin) return;
-  const ticket = await resolveTicketFromContext(ctx, true);
-  if (!ticket) {
-    middleware.reply(ctx, cache.config.language.ticketClosedError);
-    return;
-  }
-
-  await db.reopen(ticket.userid, ticket.category || '', ticket.messenger);
-  await reopenTicketTopic(ticket.messageThreadId);
-  middleware.sendMessage(
-    ctx.chat.id,
-    ctx.messenger,
-    `${cache.config.language.usr_with_ticket} #T${ticket.ticketId.toString().padStart(6, '0')} ${cache.config.language.ticketReopened}`
-  );
-};
-
 const deleteCommand = async (ctx: Context): Promise<void> => {
   if (!ctx.session.admin) return;
   const ticket = await resolveTicketFromContext(ctx, true);
@@ -266,7 +244,6 @@ export {
   closeCommand,
   unbanCommand,
   clearCommand,
-  reopenCommand,
   deleteCommand,
   helpCommand,
   directCommand,

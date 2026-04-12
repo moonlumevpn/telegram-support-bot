@@ -234,6 +234,22 @@ describe('Text Module', () => {
       expect(result).toEqual(existingTicket);
     });
 
+    it('should create a fresh ticket when a closed ticket gets a new private message', async () => {
+      const ctx = createMockContext('Follow up after close');
+      const closedTicket = {
+        ticketId: 1002,
+        userid: 'user123',
+        status: 'closed',
+        category: null,
+      };
+      mockGetTicketByUserId.mockResolvedValue(closedTicket);
+
+      await text.ticketHandler(mockAddon as any, ctx);
+
+      expect(mockAdd).toHaveBeenCalledWith('user123', 'open', null, 'telegram');
+      expect(mockChat).toHaveBeenCalledWith(ctx, ctx.message.chat);
+    });
+
     it('should handle group chat by calling staff chat handler', async () => {
       const ctx = createMockContext('Group message', 'group');
 

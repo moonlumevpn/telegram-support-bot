@@ -23,7 +23,6 @@ jest.mock('../src/db', () => ({
     status: 'open',
     messageThreadId: null,
   })),
-  reopen: jest.fn(), // Add reopen mock
   add: jest.fn(),    // Add add mock
 }));
 
@@ -209,14 +208,6 @@ describe('Commands Module', () => {
     });
   });
 
-  describe('reopenCommand', () => {
-    it('should handle ticket reopening for admin users', () => {
-      const ctx = createMockContext(true);
-      commands.reopenCommand(ctx);
-      expect(true).toBe(true);
-    });
-  });
-
   describe('banCommand', () => {
     it('should handle user banning for admin users', () => {
       const ctx = createMockContext(true);
@@ -270,7 +261,6 @@ describe('Commands Module', () => {
       };
 
       expect(() => commands.closeCommand(ctx)).not.toThrow();
-      expect(() => commands.reopenCommand(ctx)).not.toThrow();
     });
   });
 });

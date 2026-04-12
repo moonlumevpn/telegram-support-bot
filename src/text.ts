@@ -5,7 +5,6 @@ import * as users from './users';
 import * as middleware from './middleware';
 import { Addon, Context } from './interfaces';
 import { ISupportee } from './db';
-import { reopenTicketTopic } from './topics';
 
 /**
  * Checks if the given message text exists in the configured categories.
@@ -72,8 +71,7 @@ export async function ticketHandler(bot: Addon, ctx: Context): Promise<ISupporte
     if (!ticket) {
       await db.add(message.from.id, 'open', session.groupCategory, messenger);
     } else if (ticket.status === 'closed') {
-      await db.reopen(message.from.id, session.groupCategory || '', messenger);
-      await reopenTicketTopic(ticket.messageThreadId);
+      await db.add(message.from.id, 'open', session.groupCategory, messenger);
     }
     users.chat(ctx, message.chat);
     return ticket;
