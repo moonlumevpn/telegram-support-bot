@@ -5,6 +5,7 @@ import * as users from './users';
 import * as middleware from './middleware';
 import { Addon, Context } from './interfaces';
 import { ISupportee } from './db';
+import { isStaffTopicMessage } from './topics';
 
 /**
  * Checks if the given message text exists in the configured categories.
@@ -42,7 +43,7 @@ const shouldReplyWithCategoryKeyboard = (ctx: Context): boolean => {
  */
 export function handleText(bot: Addon, ctx: Context, keys: any[] = []) {
   // Handle private replies via staff
-  if (ctx.session.mode === 'private_reply') {
+  if (ctx.session.mode === 'private_reply' && !isStaffTopicMessage(ctx)) {
     return staff.privateReply(ctx);
   }
 

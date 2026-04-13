@@ -30,6 +30,7 @@ jest.mock('../src/staff', () => ({
 
 jest.mock('../src/cache', () => ({
   config: {
+    staffchat_id: 'staffchat',
     categories: [
       {
         name: 'Support',
@@ -194,6 +195,19 @@ describe('Text Module', () => {
 
       // Should not show keyboard for category messages
       expect(mockReply).not.toHaveBeenCalled();
+    });
+
+    it('should route staff topic messages through ticket handling even in private reply mode', () => {
+      const ctx = createMockContext('Reply inside topic', 'supergroup', 'private_reply', true);
+      ctx.chat.id = 'staffchat';
+      ctx.message.chat.id = 'staffchat';
+      ctx.message.message_thread_id = 42 as any;
+      const mockAddon = { platform: 'telegram' };
+
+      text.handleText(mockAddon as any, ctx, []);
+
+      expect(mockPrivateReply).not.toHaveBeenCalled();
+      expect(mockStaffChat).toHaveBeenCalledWith(ctx);
     });
   });
 

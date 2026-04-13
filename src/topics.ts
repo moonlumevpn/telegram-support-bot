@@ -7,6 +7,12 @@ import * as log from './logger';
 
 const MAX_TOPIC_NAME_LEN = 128;
 
+export function isStaffTopicMessage(ctx: Context): boolean {
+  const inStaffChat = ctx.chat?.id?.toString() === cache.config.staffchat_id.toString();
+  const threadId = (ctx.message as any)?.message_thread_id;
+  return Boolean(inStaffChat && threadId);
+}
+
 function buildTopicName(ticket: ISupportee, ctx: Context): string {
   const ticketLabel = `T${ticket.ticketId.toString().padStart(6, '0')}`;
   const userName = (ctx?.message?.from?.first_name || 'User').trim();

@@ -3,7 +3,7 @@ import cache from './cache';
 import * as middleware from './middleware';
 import { Addon, Context, ModeData } from './interfaces';
 import { ISupportee } from './db';
-import { buildStaffChatSendOptions, ensureTicketTopicId } from './topics';
+import { buildStaffChatSendOptions, ensureTicketTopicId, isStaffTopicMessage } from './topics';
 
 /**
  * Generates the reply markup for a private reply.
@@ -103,7 +103,7 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     receiverId = ticket.userid;
     captionText = message.caption || '';
   }
-  if (session.modeData?.userid != null) {
+  if (session.modeData?.userid != null && !isStaffTopicMessage(ctx)) {
     receiverId = session.modeData.userid;
     isPrivate = true;
   }
