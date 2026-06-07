@@ -1,7 +1,7 @@
 import * as db from './db';
 import cache from './cache';
 import * as middleware from './middleware';
-import { Addon, Context, ModeData } from './interfaces';
+import { Addon, Context, ModeData, ParseMode } from './interfaces';
 import { ISupportee } from './db';
 import { buildStaffChatSendOptions, ensureTicketTopicId, isStaffTopicMessage } from './topics';
 
@@ -112,7 +112,27 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
   const staffThreadId =
     receiverId === config.staffchat_id ? await ensureTicketTopicId(ticket, ctx) : null;
   const staffParseMode = config.staffchat_parse_mode || config.parse_mode;
-  const captionForStaff = middleware.strictEscape(captionText, staffParseMode);
+  let captionForStaff: string;
+  if (userInfo !== undefined && !config.anonymous_tickets) {
+    // User sending file to staff — build caption with tg:// user link
+    const userId = message.from.id;
+    const firstName = message.from.first_name;
+    const langCode = message.from.language_code;
+    const captionRaw = message.caption || '';
+    const ticketNum = `#T${ticket.id.toString().padStart(6, '0')}`;
+    let nameLink: string;
+    if (staffParseMode === ParseMode.HTML) {
+      nameLink = `<a href="tg://user?id=${userId}">${middleware.strictEscape(firstName, ParseMode.HTML)}</a> <code>${userId}</code>`;
+    } else if (staffParseMode === ParseMode.MarkdownV2 || staffParseMode === ParseMode.Markdown) {
+      nameLink = `[${middleware.strictEscape(firstName, staffParseMode)}](tg://user?id=${userId}) \`${userId}\``;
+    } else {
+      nameLink = `${firstName} (${userId})`;
+    }
+    const captionEsc = captionRaw ? `\n\n${middleware.strictEscape(captionRaw, staffParseMode)}` : '';
+    captionForStaff = `${config.language.ticket} ${ticketNum} ${config.language.from} ${nameLink} ${config.language.language}: ${langCode}${captionEsc}`;
+  } else {
+    captionForStaff = middleware.strictEscape(captionText, staffParseMode);
+  }
   const commonOptions = {
     caption: receiverId === config.staffchat_id ? captionForStaff : captionText,
     reply_markup: isPrivate ? replyMarkup(ctx) : {},
@@ -201,11 +221,15 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     : ''
     }`;
   if (session.admin && userInfo === undefined) {
-    const nameMatch = replyText.match(
-      new RegExp(`${config.language.from} (.*) ${config.language.language}`)
-    );
-    if (!nameMatch) return;
-    confirmationMessage = `${config.language.file_sent} ${nameMatch[1]}`;
+    const name = ticket.name || (() => {
+      const nameMatch = replyText.match(
+        new RegExp(`${config.language.from} (.*) ${config.language.language}`)
+      );
+      return nameMatch ? nameMatch[1] : null;
+    })();
+    if (!name) return;
+    middleware.reply(ctx, `${config.language.file_sent} ${name}`);
+    return;
   }
   middleware.sendMessage(ctx.chat.id, ticket.messenger, confirmationMessage);
 };

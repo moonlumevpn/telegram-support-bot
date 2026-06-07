@@ -30,9 +30,13 @@ function formatMessageAsTicket(
   const groupTag = ctx.session.groupTag ? ` ${esc(ctx.session.groupTag, parseMode)}` : '';
   const escapedText = esc(ctx.message.text, parseMode);
   const autoReplySuffix = autoReplyInfo ? `\n\n*${esc(autoReplyInfo, parseMode)}*` : '';
-  var name = `[${esc(ctx.message.from.first_name, parseMode)}](tg://user?id=${userId})`;
+  let name: string;
   if (config.anonymous_tickets || parseMode === ParseMode.PLAINTEXT || parseMode === 'none') {
     name = ctx.message.from.first_name;
+  } else if (parseMode === ParseMode.HTML) {
+    name = `<a href="tg://user?id=${userId}">${esc(ctx.message.from.first_name, ParseMode.HTML)}</a> <code>${userId}</code>`;
+  } else {
+    name = `[${esc(ctx.message.from.first_name, parseMode)}](tg://user?id=${userId}) \`${userId}\``;
   }
   return `${config.language.ticket} ${ticketLabel} ${config.language.from} ${name} ${config.language.language}: ${ctx.message.from.language_code}${groupTag}\n\n${escapedText}${autoReplySuffix}`;
 }
