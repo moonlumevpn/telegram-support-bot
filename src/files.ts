@@ -24,12 +24,14 @@ interface MediaGroupState {
   staffThreadId: number | null;
   isAdminToUser: boolean;
   confirmName: string | null;
-  replyText: string;
   ctx: Context;
   timer: ReturnType<typeof setTimeout>;
 }
 
+// groupId → resolved state (setup done)
 const mediaGroupBuffer = new Map<string, MediaGroupState>();
+// groupId → Promise that resolves once the first item finishes setup
+const mediaGroupSetup = new Map<string, Promise<MediaGroupState | null>>();
 
 async function flushMediaGroup(groupId: string): Promise<void> {
   const state = mediaGroupBuffer.get(groupId);
@@ -84,9 +86,6 @@ async function flushMediaGroup(groupId: string): Promise<void> {
 
 /**
  * Generates the reply markup for a private reply.
- *
- * @param ctx - The current bot context.
- * @returns The reply markup object.
  */
 const replyMarkup = (ctx: Context): object => {
   const { config } = cache;
@@ -98,10 +97,7 @@ const replyMarkup = (ctx: Context): object => {
     inline_keyboard: [
       [
         direct_reply
-          ? {
-            text: language.replyPrivate,
-            url: `https://t.me/${from.username}`,
-          }
+          ? { text: language.replyPrivate, url: `https://t.me/${from.username}` }
           : {
             text: language.replyPrivate,
             callback_data: `${from.id}---${message.from.first_name}---${modeData.category}---${modeData.ticketid}`,
@@ -112,25 +108,36 @@ const replyMarkup = (ctx: Context): object => {
 };
 
 /**
+ * Build the name+ID string for staff captions/messages.
+ * Always shows the user ID; respects anonymous_tickets for the name.
+ */
+function buildNameLink(
+  userId: string,
+  firstName: string,
+  parseMode: string,
+  anonymous: boolean,
+): string {
+  if (parseMode === ParseMode.HTML) {
+    if (anonymous) return `<a href="tg://user?id=${userId}">${userId}</a>`;
+    return `<a href="tg://user?id=${userId}">${middleware.strictEscape(firstName, ParseMode.HTML)}</a> <code>${userId}</code>`;
+  }
+  if (parseMode === ParseMode.MarkdownV2 || parseMode === ParseMode.Markdown) {
+    if (anonymous) return `[${userId}](tg://user?id=${userId})`;
+    return `[${middleware.strictEscape(firstName, parseMode)}](tg://user?id=${userId}) \`${userId}\``;
+  }
+  // plaintext / none
+  return anonymous ? `(${userId})` : `${firstName} (${userId})`;
+}
+
+/**
  * Handles forwarding of files (document, photo, video) to staff.
- *
- * @param type - The type of file ('document', 'photo', or 'video').
- * @param bot - The bot addon instance.
- * @param ctx - The bot context.
  */
 async function fileHandler(type: string, bot: Addon, ctx: Context) {
   const { message, session } = ctx;
   const { config } = cache;
-  let userid: string | number | null;
-  let replyText = '';
-  const inStaffChat =
-    ctx.chat?.id?.toString() === config.staffchat_id.toString();
-  const threadId = (message as any)?.message_thread_id;
-  const replyMessageId = message?.external_reply?.message_id;
   const mediaGroupId = (message as any)?.media_group_id as string | undefined;
-  let adminTicket: ISupportee | null = null;
 
-  // Subsequent item in an already-buffered media group — just append the file_id.
+  // ── Media group: buffer already ready ─────────────────────────────────────
   if (mediaGroupId && mediaGroupBuffer.has(mediaGroupId)) {
     const fileId = (await ctx.getFile()).file_id;
     const state = mediaGroupBuffer.get(mediaGroupId)!;
@@ -139,6 +146,45 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     state.timer = setTimeout(() => flushMediaGroup(mediaGroupId), MEDIA_GROUP_DELAY_MS);
     return;
   }
+
+  // ── Media group: first item still setting up — wait, then append ──────────
+  if (mediaGroupId && mediaGroupSetup.has(mediaGroupId)) {
+    const [fileId] = await Promise.all([
+      ctx.getFile().then((f: any) => f.file_id),
+      mediaGroupSetup.get(mediaGroupId)!,
+    ]);
+    const currentState = mediaGroupBuffer.get(mediaGroupId);
+    if (currentState && fileId) {
+      clearTimeout(currentState.timer);
+      currentState.items.push({ type, fileId, caption: message.caption || '' });
+      currentState.timer = setTimeout(() => flushMediaGroup(mediaGroupId), MEDIA_GROUP_DELAY_MS);
+    }
+    return;
+  }
+
+  // ── First item (or single file): reserve slot SYNCHRONOUSLY before any await
+  let resolveSetup: ((s: MediaGroupState | null) => void) | undefined;
+  if (mediaGroupId) {
+    mediaGroupSetup.set(
+      mediaGroupId,
+      new Promise<MediaGroupState | null>(resolve => { resolveSetup = resolve; }),
+    );
+  }
+
+  // Resolves the setup promise and cleans up the setup map.
+  const finishSetup = (state: MediaGroupState | null) => {
+    if (resolveSetup) {
+      resolveSetup(state);
+      mediaGroupSetup.delete(mediaGroupId!);
+    }
+  };
+
+  let userid: string | number | null;
+  let replyText = '';
+  const inStaffChat = ctx.chat?.id?.toString() === config.staffchat_id.toString();
+  const threadId = (message as any)?.message_thread_id;
+  const replyMessageId = message?.external_reply?.message_id;
+  let adminTicket: ISupportee | null = null;
 
   // If admin is replying in staff chat, resolve ticket by topic or replied message.
   if (session.admin) {
@@ -150,14 +196,11 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     }
   }
 
-  // If replying to a message and if the session is admin, extract ticket info
   if (message && message.reply_to_message && session.admin) {
     replyText = message.reply_to_message.text || message.reply_to_message.caption || '';
     if (replyMessageId && !adminTicket) {
       const ticketByReply = await db.getTicketByInternalId(replyMessageId);
-      if (ticketByReply) {
-        adminTicket = ticketByReply;
-      }
+      if (ticketByReply) adminTicket = ticketByReply;
     }
   }
 
@@ -167,26 +210,25 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     userid = adminTicket.userid;
     ticket = adminTicket;
   } else {
-    if (!userid) {
-      userid = message.from.id;
-    }
+    if (!userid) userid = message.from.id;
     userInfo = await forwardFile(ctx);
     ticket = await db.getTicketByUserId(userid, session.groupCategory);
   }
+
   let receiverId: string | number = config.staffchat_id;
   let isPrivate = false;
+
   if (!ticket) {
     if (session.admin && userInfo === undefined) {
       middleware.reply(ctx, config.language.ticketClosedError);
     } else {
       middleware.reply(ctx, config.language.textFirst);
     }
+    finishSetup(null);
     return;
   }
 
-  let captionText = `${config.language.ticket} #T${ticket.id
-    .toString()
-    .padStart(6, '0')} ${userInfo}\n${message.caption || ''}`;
+  let captionText = `${config.language.ticket} #T${ticket.id.toString().padStart(6, '0')} ${userInfo}\n${message.caption || ''}`;
   if (session.admin && userInfo === undefined) {
     receiverId = ticket.userid;
     captionText = message.caption || '';
@@ -200,29 +242,23 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
   const staffThreadId =
     receiverId === config.staffchat_id ? await ensureTicketTopicId(ticket, ctx) : null;
   const staffParseMode = config.staffchat_parse_mode || config.parse_mode;
+
+  // Build staff caption — always includes user ID/link regardless of anonymous_tickets.
   let captionForStaff: string;
-  if (userInfo !== undefined && !config.anonymous_tickets) {
-    // User sending file to staff — build caption with tg:// user link
+  if (userInfo !== undefined) {
     const userId = message.from.id;
     const firstName = message.from.first_name;
     const langCode = message.from.language_code;
     const captionRaw = message.caption || '';
     const ticketNum = `#T${ticket.id.toString().padStart(6, '0')}`;
-    let nameLink: string;
-    if (staffParseMode === ParseMode.HTML) {
-      nameLink = `<a href="tg://user?id=${userId}">${middleware.strictEscape(firstName, ParseMode.HTML)}</a> <code>${userId}</code>`;
-    } else if (staffParseMode === ParseMode.MarkdownV2 || staffParseMode === ParseMode.Markdown) {
-      nameLink = `[${middleware.strictEscape(firstName, staffParseMode)}](tg://user?id=${userId}) \`${userId}\``;
-    } else {
-      nameLink = `${firstName} (${userId})`;
-    }
+    const nameLink = buildNameLink(userId, firstName, staffParseMode, config.anonymous_tickets);
     const captionEsc = captionRaw ? `\n\n${middleware.strictEscape(captionRaw, staffParseMode)}` : '';
     captionForStaff = `${config.language.ticket} ${ticketNum} ${config.language.from} ${nameLink} ${config.language.language}: ${langCode}${captionEsc}`;
   } else {
     captionForStaff = middleware.strictEscape(captionText, staffParseMode);
   }
 
-  // First item of a media group — buffer everything and wait for siblings.
+  // ── Media group: buffer the first item and wait for siblings ──────────────
   if (mediaGroupId) {
     const confirmName = (session.admin && userInfo === undefined)
       ? (ticket.name || (() => {
@@ -240,106 +276,59 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
       staffThreadId,
       isAdminToUser: !!(session.admin && userInfo === undefined),
       confirmName,
-      replyText,
       ctx,
       timer: setTimeout(() => flushMediaGroup(mediaGroupId), MEDIA_GROUP_DELAY_MS),
     };
     mediaGroupBuffer.set(mediaGroupId, state);
+    finishSetup(state);
     return;
   }
 
+  // ── Single file ────────────────────────────────────────────────────────────
   const commonOptions = {
     caption: receiverId === config.staffchat_id ? captionForStaff : captionText,
     reply_markup: isPrivate ? replyMarkup(ctx) : {},
     ...(receiverId === config.staffchat_id ? buildStaffChatSendOptions(staffThreadId) : {}),
   };
 
-  // Send the file based on its type
   var messageId = null;
   switch (type) {
     case 'document':
       messageId = await bot.sendDocument(receiverId, fileId, commonOptions);
-      if (
-        session.group !== '' &&
-        session.group !== config.staffchat_id &&
-        JSON.stringify(session.modeData) !== JSON.stringify({})
-      ) {
+      if (session.group !== '' && session.group !== config.staffchat_id && JSON.stringify(session.modeData) !== JSON.stringify({})) {
         bot.sendDocument(session.group, fileId, {
           caption: captionText,
-          reply_markup: {
-            html: '',
-            inline_keyboard: [
-              [
-                {
-                  text: config.language.replyPrivate,
-                  callback_data: `${ctx.from.id}---${message.from.first_name}---${session.groupCategory}---${ticket.id}`,
-                },
-              ],
-            ],
-          },
+          reply_markup: { html: '', inline_keyboard: [[{ text: config.language.replyPrivate, callback_data: `${ctx.from.id}---${message.from.first_name}---${session.groupCategory}---${ticket.id}` }]] },
         });
       }
       break;
     case 'photo':
       messageId = await bot.sendPhoto(receiverId, fileId, commonOptions);
-      if (
-        session.group !== '' &&
-        session.group !== config.staffchat_id &&
-        JSON.stringify(session.modeData) !== JSON.stringify({})
-      ) {
+      if (session.group !== '' && session.group !== config.staffchat_id && JSON.stringify(session.modeData) !== JSON.stringify({})) {
         bot.sendPhoto(session.group, fileId, {
           caption: captionText,
-          reply_markup: {
-            html: '',
-            inline_keyboard: [
-              [
-                {
-                  text: config.language.replyPrivate,
-                  callback_data: `${ctx.from.id}---${message.from.first_name}---${session.groupCategory}---${ticket.id}`,
-                },
-              ],
-            ],
-          },
+          reply_markup: { html: '', inline_keyboard: [[{ text: config.language.replyPrivate, callback_data: `${ctx.from.id}---${message.from.first_name}---${session.groupCategory}---${ticket.id}` }]] },
         });
       }
       break;
     case 'video':
       messageId = await bot.sendVideo(receiverId, fileId, commonOptions);
-      if (
-        session.group !== '' &&
-        session.group !== config.staffchat_id &&
-        JSON.stringify(session.modeData) !== JSON.stringify({})
-      ) {
+      if (session.group !== '' && session.group !== config.staffchat_id && JSON.stringify(session.modeData) !== JSON.stringify({})) {
         bot.sendVideo(session.group, fileId, {
           caption: captionText,
-          reply_markup: {
-            html: '',
-            inline_keyboard: [
-              [
-                {
-                  text: config.language.replyPrivate,
-                  callback_data: `${ctx.from.id}---${message.from.first_name}---${session.groupCategory}---${ticket.id}`,
-                },
-              ],
-            ],
-          },
+          reply_markup: { html: '', inline_keyboard: [[{ text: config.language.replyPrivate, callback_data: `${ctx.from.id}---${message.from.first_name}---${session.groupCategory}---${ticket.id}` }]] },
         });
       }
       break;
   }
   db.addIdAndName(ticket.ticketId, messageId, ctx.message.from.first_name);
 
-  // Send confirmation message if enabled
   if (!config.autoreply_confirmation) return;
   let confirmationMessage = `${config.language.confirmationMessage}${config.show_user_ticket
-    ? config.language.yourTicketId + ' #T' + ticket.id.toString().padStart(6, '0')
-    : ''
-    }`;
+    ? config.language.yourTicketId + ' #T' + ticket.id.toString().padStart(6, '0') : ''}`;
   if (session.admin && userInfo === undefined) {
     const name = ticket.name || (() => {
-      const nameMatch = replyText.match(
-        new RegExp(`${config.language.from} (.*) ${config.language.language}`)
-      );
+      const nameMatch = replyText.match(new RegExp(`${config.language.from} (.*) ${config.language.language}`));
       return nameMatch ? nameMatch[1] : null;
     })();
     if (!name) return;
@@ -347,13 +336,10 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     return;
   }
   middleware.sendMessage(ctx.chat.id, ticket.messenger, confirmationMessage);
-};
+}
 
 /**
  * Handles file forwarding with caching and spam protection.
- *
- * @param ctx - The bot context.
- * @param callback - Callback function receiving user information.
  */
 async function forwardFile(ctx: Context) {
   const ticket = await db.getTicketByUserId(ctx.message.from.id, ctx.session.groupCategory);
@@ -364,9 +350,7 @@ async function forwardFile(ctx: Context) {
   }
   if (ok || (ticket && ticket.status !== 'banned')) {
     if (cache.ticketSent[cache.userId] === undefined) {
-      setTimeout(() => {
-        cache.ticketSent[cache.userId] = undefined;
-      }, cache.config.spam_time);
+      setTimeout(() => { cache.ticketSent[cache.userId] = undefined; }, cache.config.spam_time);
       cache.ticketSent[cache.userId] = 0;
       return forwardHandler(ctx);
     } else if (cache.ticketSent[cache.userId] < cache.config.spam_cant_msg) {
@@ -377,13 +361,10 @@ async function forwardFile(ctx: Context) {
       middleware.sendMessage(ctx.chat.id, ticket.messenger, cache.config.language.blockedSpam, {});
     }
   }
-};
+}
 
 /**
  * Determines if the message comes from a private chat and returns user info.
- *
- * @param ctx - The bot context.
- * @param callback - Callback function receiving user info (or undefined).
  */
 function forwardHandler(ctx: Context) {
   if (ctx.chat.type === 'private') {
@@ -393,6 +374,6 @@ function forwardHandler(ctx: Context) {
   } else {
     return undefined;
   }
-};
+}
 
 export { fileHandler, forwardFile, forwardHandler };
