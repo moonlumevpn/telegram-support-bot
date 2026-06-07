@@ -4,6 +4,83 @@ import * as middleware from './middleware';
 import { Addon, Context, ModeData, ParseMode } from './interfaces';
 import { ISupportee } from './db';
 import { buildStaffChatSendOptions, ensureTicketTopicId, isStaffTopicMessage } from './topics';
+import TelegramAddon from './addons/telegram';
+import * as log from './logger';
+
+const MEDIA_GROUP_DELAY_MS = 500;
+
+interface MediaGroupItem {
+  type: string;
+  fileId: string;
+  caption: string;
+}
+
+interface MediaGroupState {
+  items: MediaGroupItem[];
+  ticket: ISupportee;
+  receiverId: string | number;
+  captionForStaff: string;
+  staffParseMode: string;
+  staffThreadId: number | null;
+  isAdminToUser: boolean;
+  confirmName: string | null;
+  replyText: string;
+  ctx: Context;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const mediaGroupBuffer = new Map<string, MediaGroupState>();
+
+async function flushMediaGroup(groupId: string): Promise<void> {
+  const state = mediaGroupBuffer.get(groupId);
+  mediaGroupBuffer.delete(groupId);
+  if (!state) return;
+
+  const {
+    items, ticket, receiverId, captionForStaff, staffParseMode,
+    staffThreadId, isAdminToUser, confirmName, ctx,
+  } = state;
+  const { config } = cache;
+
+  const mediaArray = items.map((item, i) => {
+    const entry: any = { type: item.type, media: item.fileId };
+    if (i === 0) {
+      if (isAdminToUser) {
+        if (item.caption) entry.caption = item.caption;
+      } else {
+        entry.caption = captionForStaff;
+        entry.parse_mode = staffParseMode;
+      }
+    }
+    return entry;
+  });
+
+  try {
+    const extraOpts: any = {};
+    if (staffThreadId) extraOpts.message_thread_id = staffThreadId;
+    const msgs = await TelegramAddon.getInstance().bot.api.sendMediaGroup(
+      receiverId.toString(),
+      mediaArray,
+      extraOpts,
+    );
+    if (msgs?.[0]) {
+      db.addIdAndName(ticket.ticketId, msgs[0].message_id.toString(), ctx.message.from.first_name);
+    }
+  } catch (e) {
+    log.error('sendMediaGroup failed:', e);
+  }
+
+  if (!config.autoreply_confirmation) return;
+  if (isAdminToUser) {
+    if (!confirmName) return;
+    middleware.reply(ctx, `${config.language.file_sent} ${confirmName}`);
+  } else {
+    const confirmMsg = `${config.language.confirmationMessage}${config.show_user_ticket
+      ? config.language.yourTicketId + ' #T' + ticket.id.toString().padStart(6, '0')
+      : ''}`;
+    middleware.sendMessage(ctx.chat.id, ticket.messenger, confirmMsg);
+  }
+}
 
 /**
  * Generates the reply markup for a private reply.
@@ -50,7 +127,18 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     ctx.chat?.id?.toString() === config.staffchat_id.toString();
   const threadId = (message as any)?.message_thread_id;
   const replyMessageId = message?.external_reply?.message_id;
+  const mediaGroupId = (message as any)?.media_group_id as string | undefined;
   let adminTicket: ISupportee | null = null;
+
+  // Subsequent item in an already-buffered media group — just append the file_id.
+  if (mediaGroupId && mediaGroupBuffer.has(mediaGroupId)) {
+    const fileId = (await ctx.getFile()).file_id;
+    const state = mediaGroupBuffer.get(mediaGroupId)!;
+    clearTimeout(state.timer);
+    state.items.push({ type, fileId, caption: message.caption || '' });
+    state.timer = setTimeout(() => flushMediaGroup(mediaGroupId), MEDIA_GROUP_DELAY_MS);
+    return;
+  }
 
   // If admin is replying in staff chat, resolve ticket by topic or replied message.
   if (session.admin) {
@@ -133,6 +221,33 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
   } else {
     captionForStaff = middleware.strictEscape(captionText, staffParseMode);
   }
+
+  // First item of a media group — buffer everything and wait for siblings.
+  if (mediaGroupId) {
+    const confirmName = (session.admin && userInfo === undefined)
+      ? (ticket.name || (() => {
+          const m = replyText.match(new RegExp(`${config.language.from} (.*) ${config.language.language}`));
+          return m ? m[1] : null;
+        })())
+      : null;
+
+    const state: MediaGroupState = {
+      items: [{ type, fileId, caption: message.caption || '' }],
+      ticket,
+      receiverId,
+      captionForStaff,
+      staffParseMode,
+      staffThreadId,
+      isAdminToUser: !!(session.admin && userInfo === undefined),
+      confirmName,
+      replyText,
+      ctx,
+      timer: setTimeout(() => flushMediaGroup(mediaGroupId), MEDIA_GROUP_DELAY_MS),
+    };
+    mediaGroupBuffer.set(mediaGroupId, state);
+    return;
+  }
+
   const commonOptions = {
     caption: receiverId === config.staffchat_id ? captionForStaff : captionText,
     reply_markup: isPrivate ? replyMarkup(ctx) : {},
@@ -163,7 +278,7 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
             ],
           },
         });
-      } 
+      }
       break;
     case 'photo':
       messageId = await bot.sendPhoto(receiverId, fileId, commonOptions);
