@@ -109,24 +109,19 @@ const replyMarkup = (ctx: Context): object => {
 
 /**
  * Build the name+ID string for staff captions/messages.
- * Always shows the user ID; respects anonymous_tickets for the name.
  */
 function buildNameLink(
   userId: string,
   firstName: string,
   parseMode: string,
-  anonymous: boolean,
 ): string {
   if (parseMode === ParseMode.HTML) {
-    if (anonymous) return `<a href="tg://user?id=${userId}">${userId}</a>`;
     return `<a href="tg://user?id=${userId}">${middleware.strictEscape(firstName, ParseMode.HTML)}</a> <code>${userId}</code>`;
   }
   if (parseMode === ParseMode.MarkdownV2 || parseMode === ParseMode.Markdown) {
-    if (anonymous) return `[${userId}](tg://user?id=${userId})`;
     return `[${middleware.strictEscape(firstName, parseMode)}](tg://user?id=${userId}) \`${userId}\``;
   }
-  // plaintext / none
-  return anonymous ? `(${userId})` : `${firstName} (${userId})`;
+  return `${firstName} (${userId})`;
 }
 
 /**
@@ -243,15 +238,15 @@ async function fileHandler(type: string, bot: Addon, ctx: Context) {
     receiverId === config.staffchat_id ? await ensureTicketTopicId(ticket, ctx) : null;
   const staffParseMode = config.staffchat_parse_mode || config.parse_mode;
 
-  // Build staff caption — always includes user ID/link regardless of anonymous_tickets.
+  // Build staff caption with tg:// user link (only when not anonymous).
   let captionForStaff: string;
-  if (userInfo !== undefined) {
+  if (userInfo !== undefined && !config.anonymous_tickets) {
     const userId = message.from.id;
     const firstName = message.from.first_name;
     const langCode = message.from.language_code;
     const captionRaw = message.caption || '';
     const ticketNum = `#T${ticket.id.toString().padStart(6, '0')}`;
-    const nameLink = buildNameLink(userId, firstName, staffParseMode, config.anonymous_tickets);
+    const nameLink = buildNameLink(userId, firstName, staffParseMode);
     const captionEsc = captionRaw ? `\n\n${middleware.strictEscape(captionRaw, staffParseMode)}` : '';
     captionForStaff = `${config.language.ticket} ${ticketNum} ${config.language.from} ${nameLink} ${config.language.language}: ${langCode}${captionEsc}`;
   } else {

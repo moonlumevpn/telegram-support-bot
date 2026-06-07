@@ -30,26 +30,13 @@ function formatMessageAsTicket(
   const groupTag = ctx.session.groupTag ? ` ${esc(ctx.session.groupTag, parseMode)}` : '';
   const escapedText = esc(ctx.message.text, parseMode);
   const autoReplySuffix = autoReplyInfo ? `\n\n*${esc(autoReplyInfo, parseMode)}*` : '';
-  // Always show user ID/link so staff can identify the user.
-  // anonymous_tickets only suppresses the display name, not the ID.
   let name: string;
-  if (parseMode === ParseMode.PLAINTEXT || parseMode === 'none') {
-    name = config.anonymous_tickets
-      ? `(${userId})`
-      : `${ctx.message.from.first_name} (${userId})`;
+  if (config.anonymous_tickets || parseMode === ParseMode.PLAINTEXT || parseMode === 'none') {
+    name = ctx.message.from.first_name;
   } else if (parseMode === ParseMode.HTML) {
-    if (config.anonymous_tickets) {
-      name = `<a href="tg://user?id=${userId}">${userId}</a>`;
-    } else {
-      name = `<a href="tg://user?id=${userId}">${esc(ctx.message.from.first_name, ParseMode.HTML)}</a> <code>${userId}</code>`;
-    }
+    name = `<a href="tg://user?id=${userId}">${esc(ctx.message.from.first_name, ParseMode.HTML)}</a> <code>${userId}</code>`;
   } else {
-    // Markdown / MarkdownV2
-    if (config.anonymous_tickets) {
-      name = `[${userId}](tg://user?id=${userId})`;
-    } else {
-      name = `[${esc(ctx.message.from.first_name, parseMode)}](tg://user?id=${userId}) \`${userId}\``;
-    }
+    name = `[${esc(ctx.message.from.first_name, parseMode)}](tg://user?id=${userId}) \`${userId}\``;
   }
   return `${config.language.ticket} ${ticketLabel} ${config.language.from} ${name} ${config.language.language}: ${ctx.message.from.language_code}${groupTag}\n\n${escapedText}${autoReplySuffix}`;
 }
